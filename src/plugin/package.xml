@@ -22,7 +22,7 @@
   </lead>
   <date>2009-05-16</date>
   <version>
-    <release>0.1.0</release>
+    <release>0.1.1</release>
     <api>0.1.0</api>
   </version>
   <stability>
@@ -31,7 +31,7 @@
   </stability>
   <license uri="http://www.symfony-project.com/license">MIT license</license>
   <notes>
-    Initial public release of plugin.
+    Added a "Known Issues" section to the README.
   </notes>
   <contents>
     <dir name="/">
@@ -72,6 +72,20 @@
       <license uri="http://www.symfony-project.com/license">MIT license</license>
       <notes>
         Initial public release.
+      </notes>
+    </release>
+    <release>
+      <version>
+        <release>0.1.1</release>
+        <api>0.1.0</api>
+      </version>
+      <stability>
+        <release>alpha</release>
+        <release>alpha</release>
+      </stability>
+      <license uri="http://www.symfony-project.com/license">MIT license</license>
+      <notes>
+        Added a "Known Issues" section to the README.
       </notes>
     </release>
   </changelog>
