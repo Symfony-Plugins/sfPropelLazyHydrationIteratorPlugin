@@ -87,6 +87,28 @@ class sfPropelLazyHydrationIterator implements Iterator
   }
   
   /**
+   * Reports the number of items in the result.
+   *
+   * @return integer
+   * @author John Lianoglou <prometheas@gmail.com>
+   */
+  public function count()
+  {
+    return $this->resultSet->getRecordCount();
+  }
+  
+  /**
+   * Reports the number of items in the result.
+   *
+   * @return bool
+   * @author John Lianoglou <prometheas@gmail.com>
+   */
+  public function isEmpty()
+  {
+    return $this->count() === 0;
+  }
+  
+  /**
    * Returns a hydrated instance of the appropriate model class, using
    * the row data at the ResultSet's current pointer position.
    *

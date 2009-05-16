@@ -1,0 +1,176 @@
+# sfPropelLazyHydrationIteration plugin
+
+The `sfPropelLazyHydrationIterationPlugin` is a Symfony plugin designed for Propel 1.2-based projects that make use of "lazy hydration" to deal with larger database result sets.  Specifically, it provides a higher-level API for doing so, that relieves your application's own business logic from dealing with [Creole](http://creole.phpdg.org)'s `ResultSet` objects.
+
+Essentially, code that would normally need to look like this:
+
+    [php]
+    $rs = AuthorPeer::doSelectRS( new Criteria() );
+    while( $rs->next() )
+    {
+      $author = new Author();
+      $author->hydrate( $rs );
+      echo "{$author->getLastName()}, {$author->getFirstName()}";
+    }
+
+Can instead look like _this_:
+
+    [php]
+    $authors = new sfPropelLazyHydrationIterator('Author', new Criteria());
+    foreach( $authors as $author )
+    {
+      echo "{$author->getLastName()}, {$author->getFirstName()}";
+    }
+
+Or _even this_ (with just a touch of effort):
+
+    [php]
+    foreach( AuthorPeer::doSelectLazy(new Criteria()) as $author )
+    {
+      echo "{$author->getLastName()}, {$author->getFirstName()}";
+    }
+
+Sound appealing?  Let's start.
+
+
+## Installation
+
+1. Install the plugin:
+   
+        $ symfony plugin:install sfPropelLazyHydrationIterationPlugin
+   
+   Alternatively, you may check out the sources from the svn repository: <http://svn.symfony-project.com/plugins/sfLightboxPlugin> and publish the assets with the `symfony plugin:publish-assets` task)
+   
+2. Clear your cache
+   
+        $ symfony cc
+
+
+## Usage
+
+The main class in the plugin is the `sfPropelLazyHydrationIterator`.  This class actually implements the "lazy hydration" example it replaces internally, but hides it away into an object that implements PHP's `Iterator` interface ([more info](http://us.php.net/class.iterator)).
+
+Let's take a very simple look at the class in use:
+
+    [php]
+    // prepare the Criteria to describe the query you'd like to issue
+    $crit = new Criteria();
+    
+    // let's identify the name of the model class we're going to retrieve
+    $model_class = 'Author';
+    
+    // finally, let's create the iterator
+    $authors = new sfPropelLazyHydrationIterator($model_class, $crit);
+    
+    // finally, let's iterate over each Author that matches our query
+    foreach( $autors as $author )
+    {
+      // do something with $author
+    }
+    
+The sample above shows the most basic use of the `sfPropelLazyHydrationIterator`.  The constructor requires at least two parameters: the name of the Propel model class that must be retrieved, and a `Criteria` object.
+
+The `sfPropelLazyHydrationIterator` also allows for the specification of a particular Propel `Connection`, as follows:
+
+    [php]
+    try
+    {
+      $crit = new Criteria();
+      $model_class = 'Author';
+      
+      // let's create a transaction
+      $con = Propel::getConnection();
+      $con->begin();
+      
+      $authors = new sfPropelLazyHydrationIterator($model_class, $crit, $con);
+      
+      // finally, let's iterate over each Author that matches our query
+      foreach( $autors as $author )
+      {
+        // change some data in the $author
+        $author->save( $con );
+      }
+    }
+    catch (SQLException $sqle)
+    {
+      $con->rollback();
+      throw $sqle;
+    }
+
+As shown in the example above, the constructor accepts both `Criteria` and `Connection` objects, as do each of the the `*Peer::doSelect()` and `*Peer::doSelectRS()` methods in your model.
+
+
+### Model Integration
+
+In order to get the most utility out of this new class, let's get this functionality into all of each peer class for which it's useful.
+
+Keeping with our examples, let's look at `AuthorPeer`:
+
+    [php]
+    # lib/model/AuthorPeer.php
+    class AuthorPeer extends BaseAuthorPeer
+    {
+      
+      /**
+       * Create a `sfPropelLazyHydrationIterator` instance for use in
+       * resource-efficient iteration of query results.
+       *
+       * @param Criteria $c 
+       * @param Connection $con 
+       * @return Iterator
+       */
+      public static function doSelectLazy($c, $con=null)
+      {
+        return new sfPropelLazyHydrationIterator('Author', $crit, $con);
+      }
+      
+      // other methods ...
+      
+    }
+    
+This simple method allows the following code block to be used throughout your project:
+
+    [php]
+    foreach( AuthorPeer::doSelectLazy(new Criteria()) as $author )
+    {
+      // do something with $author
+    }
+
+When adding a `doSelectLazy()` method to each peer in your model, do note that you'll have to vary the first parameter of the constructor call, which instead of `'Author'` should reflect the peer's own model class counterpart.
+
+
+## Considerations
+
+It may seem tempting to replace all your `doSelect()` invocations with `doSelectLazy()` calls, but there are a couple of points to consider before you do, since `doSelect()` returns an array of objects, while `doSelectLazy()` returns an `Iterator` which is _not_ an array.
+
+Let's look at some differences between the two.
+
+Since the traditional traditional `doSelect()` code returns a PHP array, a sample template file might look like this:
+
+    [php]
+    <?php if (! empty($authors_array)): ?>
+      <div class="status">Found <?php echo count($authors_array) ?>.</div>
+      <ul class="authors">
+        <?php foreach ( $authors_array as $author ): ?>
+          <li><?php echo $author->getLastName() ?>, <?php echo $author->getFirstName() ?></li>
+        <?php endforeach ?>
+      </ul>
+    <?php else: ?>
+      <p class="status no_results">No authors were found.</p>
+    <?php endif ?>
+    
+Note the use of PHP functions such as `count()`, and `empty()`.  Since the `sfPropelLazyHydrationIterator` isn't a PHP array, these techniques aren't suitable.  Luckily, the class does provide a number of methods that provide parallel utility:
+
+    [php]
+    <?php if (! $authors_lazy->isEmpty()): ?>
+      <div class="status">Found <?php echo $authors_lazy->count() ?>.</div>
+      <ul class="authors">
+        <?php foreach ( $authors_lazy as $author ): ?>
+          <li><?php echo $author->getLastName() ?>, <?php echo $author->getFirstName() ?></li>
+        <?php endforeach ?>
+      </ul>
+    <?php else: ?>
+      <p class="status no_results">No authors were found.</p>
+    <?php endif ?>
+
+All this to say that you should be able to accomplish all the same types of things, regardless of which selection mechanism you decide to use, but that they are _not_ transparently interchangeable with each other in existing code.
